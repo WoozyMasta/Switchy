@@ -10,6 +10,8 @@ in a configuration file.
 Pressing the key will instantly toggle between them,
 ignoring any other layouts installed on the system.
 
+![switchy](switchy.jpg)
+
 The switching happens silently
 (using the direct `WM_INPUTLANGCHANGEREQUEST` message),
 so it does not trigger the annoying Windows 10/11 language pop-up menu.
