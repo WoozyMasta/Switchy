@@ -37,7 +37,7 @@ so it does not trigger the annoying Windows 10/11 language pop-up menu.
 To run Switchy automatically:
 
 1. Press **Win+R**, type `shell:startup`, and press Enter.
-1. Create a shortcut to `Switchy.exe` in that folder.
+1. Create a shortcut to `switchy.exe` in that folder.
 
 > [!NOTE]  
 > For keyboard switching to work inside programs
