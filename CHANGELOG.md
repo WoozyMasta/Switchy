@@ -13,6 +13,22 @@ and this project adheres to [Semantic Versioning][].
 ### Removed
 -->
 
+## [2.0.1] - 2025-12-18
+
+### Added
+
+* If a specific layout (`Layout1` or `Layout2`) is missing from the
+  configuration file or fails to load, the application now individually
+  falls back to the system's default layouts instead of failing.
+
+### Fixed
+
+* Fixed an issue where the `.ini` file wasn't found when the app was
+  launched via a shortcut (e.g., from `shell:startup`).
+  It now correctly looks for the config next to the actual `.exe` file.
+
+[2.0.1]: https://github.com/WoozyMasta/Switchy/compare/2.0.0...2.0.1
+
 ## [2.0.0] - 2025-12-18
 
 ### Added

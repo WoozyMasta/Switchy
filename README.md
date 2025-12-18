@@ -49,21 +49,26 @@ To run Switchy automatically:
 
 The program looks for `switchy.ini` in the same directory as the executable.
 
+> [!TIP]
+> If you leave `Layout1` or `Layout2` empty (or delete the lines), Switchy
+> will automatically use your system's default keyboard layouts for them.
+
 ```ini
 [Settings]
-; Layout codes (Hexadecimal)
+; Layout codes
 ; 00000409 = English (US)
 ; 00000419 = Russian
 ; 00000422 = Ukrainian
 ; 00000407 = German
 ; 0000040C = French
+; Leave empty for auto-detection of system layouts.
 Layout1=00000409
 Layout2=00000419
 
 ; The Virtual Key Code for switching (Decimal).
-; 20  = Caps Lock (Default)
-; 19  = Pause/Break
-; 45  = Insert
+; 20 = Caps Lock (Default)
+; 19 = Pause/Break
+; 45 = Insert
 ; 112 = F1
 SwitchKey=20
 ```

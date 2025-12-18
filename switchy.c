@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /**
    @brief Global configuration and state variables.
@@ -39,33 +40,66 @@ void ShowError(LPCSTR message)
    @brief Loads configuration from switchy.ini located near the executable.
 
    Reads target layout IDs and the custom hotkey code.
+   If layouts are not defined in ini, tries to detect system layouts.
 */
 void LoadSettings()
 {
   char exePath[MAX_PATH];
-  GetModuleFileName(NULL, exePath, MAX_PATH);
+  if (GetModuleFileName(NULL, exePath, MAX_PATH) == 0)
+  {
+    ShowError("Failed to get executable path.");
+    return;
+  }
 
   // Construct path to ini file
   char * lastSlash = strrchr(exePath, '\\');
   if (lastSlash) *lastSlash = '\0';
   snprintf(iniPath, MAX_PATH, "%s\\switchy.ini", exePath);
 
-  char layoutStr1[KL_NAMELENGTH];
-  char layoutStr2[KL_NAMELENGTH];
+  // Get system layouts
+  HKL * sysLayouts = NULL;
+  UINT sysCount = GetKeyboardLayoutList(0, NULL);
+  if (sysCount > 0)
+  {
+    sysLayouts = (HKL *)malloc(sysCount * sizeof(HKL));
+    if (sysLayouts) GetKeyboardLayoutList(sysCount, sysLayouts);
+  }
 
-  // Read Layouts (Default: US and RU)
-  GetPrivateProfileString("Settings", "Layout1", "00000409", layoutStr1, KL_NAMELENGTH, iniPath);
-  GetPrivateProfileString("Settings", "Layout2", "00000419", layoutStr2, KL_NAMELENGTH, iniPath);
+  // Get INI layouts
+  char layoutStr1[KL_NAMELENGTH] = { 0 };
+  char layoutStr2[KL_NAMELENGTH] = { 0 };
+
+  // Read Layouts (Default: empty string to trigger auto-detection)
+  GetPrivateProfileString("Settings", "Layout1", "", layoutStr1, KL_NAMELENGTH, iniPath);
+  GetPrivateProfileString("Settings", "Layout2", "", layoutStr2, KL_NAMELENGTH, iniPath);
 
   // Read Custom Hotkey (Default: 20 -> VK_CAPITAL)
   hotkeyVkCode = GetPrivateProfileInt("Settings", "SwitchKey", VK_CAPITAL, iniPath);
 
-  // Load keyboard layouts into memory
-  hLayout1 = LoadKeyboardLayout(layoutStr1, KLF_NOTELLSHELL);
-  hLayout2 = LoadKeyboardLayout(layoutStr2, KLF_NOTELLSHELL);
+  // Layout 1
+  hLayout1 = NULL;
+  if (strlen(layoutStr1) > 0) {
+      hLayout1 = LoadKeyboardLayout(layoutStr1, KLF_NOTELLSHELL);
+  }
+  if (!hLayout1 && sysLayouts && sysCount > 0) {
+      hLayout1 = sysLayouts[0];
+      LOG("Layout1 auto-detected: %p\n", hLayout1);
+  }
+
+  // Layout 2
+  hLayout2 = NULL;
+  if (strlen(layoutStr2) > 0) {
+      hLayout2 = LoadKeyboardLayout(layoutStr2, KLF_NOTELLSHELL);
+  }
+  if (!hLayout2 && sysLayouts && sysCount > 0) {
+      hLayout2 = (sysCount > 1) ? sysLayouts[1] : sysLayouts[0];
+      LOG("Layout2 auto-detected: %p\n", hLayout2);
+  }
+
+  if (sysLayouts) free(sysLayouts);
 
   if (!hLayout1 || !hLayout2)
-    ShowError("Could not load layouts from config. Check switchy.ini codes.");
+    ShowError("Could not determine layouts. Check switchy.ini or system settings.");
 
   LOG("Config Loaded: L1=%p, L2=%p, Hotkey=%d\n", hLayout1, hLayout2, hotkeyVkCode);
 }
