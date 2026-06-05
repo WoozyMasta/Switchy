@@ -48,8 +48,7 @@ jobs:
         run: make wix
 
       - name: Build MSI
-        shell: msys2 {0}
-        run: make msi VERSION=${{ github.ref_name }}
+        run: wix build -acceptEula wix7 -ext WixToolset.Util.wixext switchy.wxs -d Version=${{ github.ref_name }} -o switchy.msi
 
       - name: Extract changelog
         shell: msys2 {0}
