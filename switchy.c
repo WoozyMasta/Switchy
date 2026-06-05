@@ -60,8 +60,9 @@ BOOL appSwitchRequired = FALSE; ///< Alt went down while hotkey active:
                                 ///< next Alt keyup toggles enabled.
 BOOL hotkeyOriginalActionRequired =
     FALSE; ///< Shift+hotkey: later inject real key press (e.g. Caps LED).
-BOOL hotkeyProcessed = FALSE;    ///< Hotkey currently held (Alt/Shift context).
-BOOL hotkeyPassedThrough = FALSE; ///< KEYDOWN was passed through (excluded window).
+BOOL hotkeyProcessed = FALSE; ///< Hotkey currently held (Alt/Shift context).
+BOOL hotkeyPassedThrough =
+    FALSE; ///< KEYDOWN was passed through (excluded window).
 BOOL shiftProcessed = FALSE; ///< Shift held (passthrough Caps).
 
 BOOL convertWithCtrl = TRUE; ///< INI: Ctrl+switch runs conversion when TRUE.
@@ -1049,7 +1050,8 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
         {
           // Check whether this window is excluded; if so pass the key through.
           BOOL ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-          BOOL wouldConvert = (ctrlDown && convertWithCtrl) || (!ctrlDown && smartCaps);
+          BOOL wouldConvert =
+              (ctrlDown && convertWithCtrl) || (!ctrlDown && smartCaps);
           if (ShouldExclude(wouldConvert ? FALSE : TRUE))
           {
             hotkeyPassedThrough = TRUE;
