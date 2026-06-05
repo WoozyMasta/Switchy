@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning][].
 ### Removed
 -->
 
+## [2.2.0] - 2026-06-05
+
+### Added
+
+* New INI option `SwitchTimeoutMs` (default `80`):
+  controls the `SendMessageTimeout` deadline for layout-switch requests;
+  lower values reduce first-letter lag on fast typing.
+* MSI installer WiX: installs to `%ProgramFiles%\Switchy\`
+  and registers autostart via `HKCU\...\Run`.
+* Unit tests for the character-mapping module (`tests/test_charmap.c`).
+
+### Fixed
+
+* ASCII punctuation shared between layouts (`.` `,` and similar)
+  no longer gets remapped to a different symbol
+  when converting mixed-layout text in the reverse direction.
+
+### Changed
+
+* `SwitchTimeoutMs` default reduced from 200 ms to 80 ms.
+
+[2.2.0]: https://github.com/WoozyMasta/Switchy/compare/2.1.0...2.2.0
+
 ## [2.1.0] - 2026-04-07
 
 ### Added
