@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning][].
 ### Removed
 -->
 
+## [2.3.0] - 2026-06-05
+
+### Added
+
+* `FullScreenExcludeSwitch` and `FullScreenExcludeConvert` INI bit flags
+  for automatically suppress layout switching and/or conversion
+  for fullscreen or borderless-window apps without listing them by name.
+* Per-entry scope for `[ExcludeSwitch]` and `[ExcludeConvert]` entries:
+  the INI value now controls whether suppression is scoped to the
+  active window or to any running instance
+  of the process (`0`, global mode).
+
+### Changed
+
+* `[ExcludeSwitch]` and `[ExcludeConvert]` previously checked only the
+  foreground window;
+  the new `=0` syntax opts individual entries into global suppression
+  (while keeping per-window as the default).
+  Existing configs (`exe.name=` with no value) are unaffected.
+* Shipped `switchy.ini` now has `Layout1` and `Layout2` empty by default,
+  so auto-detection of system layouts is used out of the box
+  instead of hardcoded codes.
+
+[2.3.0]: https://github.com/WoozyMasta/Switchy/compare/2.2.0...2.3.0
+
 ## [2.2.0] - 2026-06-05
 
 ### Added
