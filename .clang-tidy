@@ -1,0 +1,23 @@
+---
+Checks: >
+  -*,
+  clang-analyzer-core.*,
+  clang-analyzer-deadcode.*,
+  clang-analyzer-nullability.*,
+  clang-analyzer-security.*,
+  clang-analyzer-unix.Malloc,
+  bugprone-branch-clone,
+  bugprone-integer-overflow,
+  bugprone-misplaced-widening-cast,
+  bugprone-reserved-identifier,
+  bugprone-signed-char-misuse,
+  bugprone-sizeof-expression,
+  bugprone-suspicious-memset-usage,
+  bugprone-suspicious-realloc-usage,
+  bugprone-undefined-memory-manipulation,
+  misc-redundant-expression,
+  misc-unused-parameters
+
+WarningsAsErrors: '*'
+
+HeaderFilterRegex: '^(?!.*[/\\](ucrt64|mingw|MSVC)[/\\]).*'

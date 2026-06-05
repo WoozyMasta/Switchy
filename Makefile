@@ -6,7 +6,13 @@ SRC = switchy.c charmap.c
 TARGET = switchy.exe
 VERSION ?= 0.0.0
 
-.PHONY: all build msi clean test test-charmap release-notes release
+CLANG_FORMAT ?= clang-format
+# lint requires MSYS2 clang-tidy (mingw-w64-ucrt-x86_64-clang-tools-extra).
+# Run from MSYS2 terminal or override: make lint CLANG_TIDY=/path/to/clang-tidy
+CLANG_TIDY   ?= clang-tidy
+FORMAT_SRCS   = switchy.c charmap.c charmap.h tests/test_charmap.c
+
+.PHONY: all build msi clean test test-charmap fmt fmt-check lint release-notes release
 
 all: clean test build msi
 
@@ -25,6 +31,15 @@ test: test-charmap
 
 test-charmap: charmap.c tests/test_charmap.c
 	$(CC) charmap.c tests/test_charmap.c -o tests/test_charmap.exe $(CFLAGS_TEST) $(LIBS)
+
+fmt:
+	$(CLANG_FORMAT) -i $(FORMAT_SRCS)
+
+fmt-check:
+	$(CLANG_FORMAT) --dry-run --Werror $(FORMAT_SRCS)
+
+lint:
+	$(CLANG_TIDY) -quiet $(SRC) -- -std=c99
 
 clean:
 	rm -f $(TARGET) tests/test_charmap.exe switchy.msi

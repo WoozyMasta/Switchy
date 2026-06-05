@@ -4,7 +4,6 @@
  *        and optional clipboard-based layout conversion.
  */
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -279,14 +278,14 @@ BOOL LoadSettings(void)
       sysLayouts = (HKL *)malloc(needLayouts * sizeof(HKL));
       if (sysLayouts)
       {
-        sysCount = GetKeyboardLayoutList(needLayouts, sysLayouts);
         sysLayoutsHeap = TRUE;
       }
       else
       {
-        sysCount = GetKeyboardLayoutList(SYS_LAYOUTS_STACK_MAX, stackLayouts);
+        needLayouts = SYS_LAYOUTS_STACK_MAX;
         sysLayouts = stackLayouts;
       }
+      sysCount = GetKeyboardLayoutList(needLayouts, sysLayouts);
     }
   }
 
@@ -585,25 +584,26 @@ static void SimulateOriginalKeyPress(void)
 }
 
 /**
+ * @brief Presses key + left-Shift then releases both.
+ */
+static void PressShiftWith(WORD key)
+{
+  PressKey(key);
+  PressKey(VK_LSHIFT);
+  ReleaseKey(key);
+  ReleaseKey(VK_LSHIFT);
+}
+
+/**
  * @brief Sends Alt+Shift, Ctrl+Shift,
  *        or Win+Space per fallbackCycleHotkey if layout stuck.
  */
 static void SendSyntheticCycleHotkey(void)
 {
   if (fallbackCycleHotkey == 1)
-  {
-    PressKey(VK_MENU);
-    PressKey(VK_LSHIFT);
-    ReleaseKey(VK_MENU);
-    ReleaseKey(VK_LSHIFT);
-  }
+    PressShiftWith(VK_MENU);
   else if (fallbackCycleHotkey == 2)
-  {
-    PressKey(VK_CONTROL);
-    PressKey(VK_LSHIFT);
-    ReleaseKey(VK_CONTROL);
-    ReleaseKey(VK_LSHIFT);
-  }
+    PressShiftWith(VK_CONTROL);
   else if (fallbackCycleHotkey == 3)
   {
     PressKey(VK_LWIN);
@@ -681,14 +681,9 @@ void SwitchToSpecificLayout(void)
   HKL cur = GetKeyboardLayout(tid);
   HKL target;
 
-  // Unknown third layout: always jump toward hLayout1
-  // then user toggles between the pair
-  if (cur == hLayout1)
-    target = hLayout2;
-  else if (cur == hLayout2)
-    target = hLayout1;
-  else
-    target = hLayout1;
+  // Unknown third layout falls through to hLayout1;
+  // toggles between the configured pair otherwise.
+  target = (cur == hLayout1) ? hLayout2 : hLayout1;
 
   SwitchToLayoutHKL(target);
 }
@@ -801,13 +796,8 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
   HKL to;
 
   // Convert toward the "other" configured layout;
-  // unknown current maps to hLayout1 -> hLayout2
-  if (from == hLayout1)
-    to = hLayout2;
-  else if (from == hLayout2)
-    to = hLayout1;
-  else
-    to = hLayout1;
+  // unknown current layout maps toward hLayout2.
+  to = (from == hLayout1) ? hLayout2 : hLayout1;
 
   BackupCbResult br = BackupUnicodeClipboard();
   if (br == BackupCb_TooLarge || br == BackupCb_OpenFailed)

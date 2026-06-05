@@ -44,32 +44,25 @@ static void SetKeyStateEmpty(BYTE ks[256])
  */
 static void ApplyStateIndex(BYTE ks[256], int stateIdx)
 {
-  SetKeyStateEmpty(ks);
-  switch (stateIdx)
+  static const struct
   {
-  case 0:
-    break;
-  case 1:
-    ks[VK_SHIFT] = 0x80;
-    break;
-  case 2:
-    ks[VK_CONTROL] = 0x80;
-    break;
-  case 3:
-    ks[VK_SHIFT] = 0x80;
-    ks[VK_CONTROL] = 0x80;
-    break;
-  case 4:
-    ks[VK_MENU] = 0x80;
-    break;
-  case 5:
-    // AltGr-style Ctrl+Alt
-    ks[VK_CONTROL] = 0x80;
-    ks[VK_MENU] = 0x80;
-    break;
-  default:
-    break;
-  }
+    BYTE shift;
+    BYTE ctrl;
+    BYTE alt;
+  } kMods[6] = {
+      {0, 0, 0}, /* none */
+      {0x80, 0, 0}, /* Shift */
+      {0, 0x80, 0}, /* Ctrl */
+      {0x80, 0x80, 0}, /* Shift+Ctrl */
+      {0, 0, 0x80}, /* Alt */
+      {0, 0x80, 0x80}, /* Ctrl+Alt (AltGr) */
+  };
+  SetKeyStateEmpty(ks);
+  if (stateIdx < 0 || stateIdx >= 6)
+    return;
+  ks[VK_SHIFT] = kMods[stateIdx].shift;
+  ks[VK_CONTROL] = kMods[stateIdx].ctrl;
+  ks[VK_MENU] = kMods[stateIdx].alt;
 }
 
 /**

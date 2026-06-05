@@ -24,8 +24,17 @@ jobs:
           update: true
           install: >-
             mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-clang-tools-extra
             make
             gawk
+
+      - name: Check formatting
+        shell: msys2 {0}
+        run: make fmt-check
+
+      - name: Run lint
+        shell: msys2 {0}
+        run: make lint
 
       - name: Run tests
         shell: msys2 {0}
