@@ -10,8 +10,8 @@
 #define TO_UNICODE_NO_KEYBOARD_STATE_MUTATION 0x4 ///< ToUnicodeEx: do not mutate global keyboard state (Win10 1607+).
 #endif
 
-static WCHAR g_map_l1_to_l2[65536]; ///< L1→L2: UTF-16 index → mapped char; 0 means no mapping stored.
-static WCHAR g_map_l2_to_l1[65536]; ///< L2→L1 reverse map.
+static WCHAR g_map_l1_to_l2[65536]; ///< L1->L2: UTF-16 index -> mapped char; 0 means no mapping stored.
+static WCHAR g_map_l2_to_l1[65536]; ///< L2->L1 reverse map.
 
 static HKL g_h1; ///< Layout handle from last Switchy_BuildCharMaps (first).
 static HKL g_h2; ///< Layout handle from last Switchy_BuildCharMaps (second).
@@ -34,7 +34,7 @@ static void SetKeyStateEmpty(BYTE ks[256])
 }
 
 /**
- * @brief Sets modifier bits in a keyboard state for one of six fixed combinations (Shift / AltGr / …).
+ * @brief Sets modifier bits in a keyboard state for one of six fixed combinations (Shift / AltGr / ...).
  * @param ks Output keyboard state.
  * @param stateIdx 0=none, 1=Shift, 2=Ctrl, 3=Shift+Ctrl, 4=Alt, 5=Ctrl+Alt (AltGr-style).
  */
@@ -69,7 +69,7 @@ static void ApplyStateIndex(BYTE ks[256], int stateIdx)
 }
 
 /**
- * @brief Builds BMP char maps from ToUnicodeEx for each VK × modifier slice; see charmap.h.
+ * @brief Builds BMP char maps from ToUnicodeEx for each VK x modifier slice; see charmap.h.
  */
 void Switchy_BuildCharMaps(HKL h1, HKL h2)
 {
@@ -117,8 +117,8 @@ void Switchy_BuildCharMaps(HKL h1, HKL h2)
   }
 
   // Remove reverse-map entries for code points that appear in both maps.
-  // A character "native" to L1 (has a forward L1→L2 entry) should pass through
-  // unchanged when encountered in L2→L1 conversion rather than being remapped to
+  // A character "native" to L1 (has a forward L1->L2 entry) should pass through
+  // unchanged when encountered in L2->L1 conversion rather than being remapped to
   // a different L1 key.  This prevents ASCII punctuation shared by both layouts
   // (e.g. '.' and ',' which sit on different physical keys in EN vs RU) from
   // being corrupted when converting mixed-layout text.

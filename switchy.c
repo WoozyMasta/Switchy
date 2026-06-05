@@ -711,7 +711,7 @@ static BOOL PostDeferConvert(ConvertInputKind kind, BOOL switchOnEmpty)
 }
 
 /**
- * @brief Copy → convert → paste pipeline, then switch to the target layout.
+ * @brief Copy -> convert -> paste pipeline, then switch to the target layout.
  * @param kind ConvertInput_CtrlHeld: user holds Ctrl, only C/V are injected.
  *             ConvertInput_SyntheticCtrl: full Ctrl+C / Ctrl+V (plain SmartCaps).
  * @param switchLayoutOnEmpty If TRUE, call SwitchToSpecificLayout when we skip conversion
@@ -742,7 +742,7 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
   HKL from = GetKeyboardLayout(tid);
   HKL to;
 
-  // Convert toward the “other” configured layout; unknown current maps to hLayout1 → hLayout2
+  // Convert toward the "other" configured layout; unknown current maps to hLayout1 -> hLayout2
   if (from == hLayout1)
     to = hLayout2;
   else if (from == hLayout2)
@@ -782,7 +782,7 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
     return;
   }
 
-  // Empty or identical to pre-copy snapshot ⇒ treat as “no selection”; do not paste
+  // Empty or identical to pre-copy snapshot ->treat as "no selection"; do not paste
   if (textLen == 0 || ClipboardUnchangedAfterCopy(text, textLen))
   {
     AbortTryConvert(text, switchLayoutOnEmpty);

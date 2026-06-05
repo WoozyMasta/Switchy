@@ -36,7 +36,7 @@ static int s_skipped = 0;
 
 static void test_convert_null_hkls(void)
 {
-  /* Unknown HKL pair → identity copy */
+  /* Unknown HKL pair -> identity copy */
   Switchy_BuildCharMaps(NULL, NULL);
   WCHAR out[32] = {0};
   Switchy_ConvertString(L"hello", 5, out, 32, NULL, NULL);
@@ -81,12 +81,12 @@ static void test_convert_unknown_pair_identity(void)
 
 static void test_convert_equal_hkls_noop(void)
 {
-  /* Equal HKLs → BuildCharMaps is a no-op; ConvertString should return identity */
+  /* Equal HKLs -> BuildCharMaps is a no-op; ConvertString should return identity */
   HKL h = (HKL)(size_t)0xCAFE;
   Switchy_BuildCharMaps(h, h);
   WCHAR out[16] = {0};
   Switchy_ConvertString(L"equal", 5, out, 16, h, h);
-  /* maps were cleared (no-op build), so unknown pair → identity */
+  /* maps were cleared (no-op build), so unknown pair -> identity */
   ASSERT_WSTREQ(out, L"equal", "Equal HKLs: identity copy");
 }
 
@@ -106,7 +106,7 @@ static void test_layout_specific(HKL hEN, HKL hRU)
   Switchy_BuildCharMaps(hEN, hRU);
   WCHAR out[64] = {0};
 
-  /* EN → RU specific character mappings */
+  /* EN -> RU specific character mappings */
   Switchy_ConvertString(L",", 1, out, 64, hEN, hRU);
   ASSERT_WSTREQ(out, L"б", "EN ',' -> RU 'б'");
 
@@ -122,7 +122,7 @@ static void test_layout_specific(HKL hEN, HKL hRU)
   Switchy_ConvertString(L"q", 1, out, 64, hEN, hRU);
   ASSERT_WSTREQ(out, L"й", "EN 'q' -> RU 'й'");
 
-  /* RU → EN specific character mappings */
+  /* RU -> EN specific character mappings */
   Switchy_ConvertString(L"б", 1, out, 64, hRU, hEN);
   ASSERT_WSTREQ(out, L",", "RU 'б' -> EN ','");
 
@@ -132,7 +132,7 @@ static void test_layout_specific(HKL hEN, HKL hRU)
   Switchy_ConvertString(L"я", 1, out, 64, hRU, hEN);
   ASSERT_WSTREQ(out, L"z", "RU 'я' -> EN 'z'");
 
-  /* Bug-3 regression: ASCII punctuation must pass through in RU→EN */
+  /* Bug-3 regression: ASCII punctuation must pass through in RU->EN */
   Switchy_ConvertString(L".", 1, out, 64, hRU, hEN);
   ASSERT_WSTREQ(out, L".", "RU->EN: '.' passes through (not '/')");
 
@@ -147,7 +147,7 @@ static void test_layout_specific(HKL hEN, HKL hRU)
   Switchy_ConvertString(mid, wcslen(mid), back, 16, hEN, hRU);
   ASSERT_WSTREQ(back, cyrillic, "Round-trip RU->EN->RU: привет");
 
-  /* Mixed text: Cyrillic + ASCII punctuation RU→EN */
+  /* Mixed text: Cyrillic + ASCII punctuation RU->EN */
   /* "привет," - comma should survive as ',' not '?' */
   const WCHAR mixed[] = {0x043f, 0x0440, 0x0438, 0x0432, 0x0435, 0x0442, L',', 0};
   Switchy_ConvertString(mixed, wcslen(mixed), out, 64, hRU, hEN);
