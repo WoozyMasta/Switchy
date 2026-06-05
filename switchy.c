@@ -60,7 +60,8 @@ BOOL appSwitchRequired = FALSE; ///< Alt went down while hotkey active:
                                 ///< next Alt keyup toggles enabled.
 BOOL hotkeyOriginalActionRequired =
     FALSE; ///< Shift+hotkey: later inject real key press (e.g. Caps LED).
-BOOL hotkeyProcessed = FALSE; ///< Hotkey currently held (Alt/Shift context).
+BOOL hotkeyProcessed = FALSE;    ///< Hotkey currently held (Alt/Shift context).
+BOOL hotkeyPassedThrough = FALSE; ///< KEYDOWN was passed through (excluded window).
 BOOL shiftProcessed = FALSE; ///< Shift held (passthrough Caps).
 
 BOOL convertWithCtrl = TRUE; ///< INI: Ctrl+switch runs conversion when TRUE.
@@ -1026,6 +1027,7 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
       {
         appSwitchRequired = TRUE;
         hotkeyProcessed = TRUE;
+        hotkeyPassedThrough = FALSE;
         return 1;
       }
 
@@ -1035,15 +1037,25 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
         enabled = !enabled;
         appSwitchRequired = FALSE;
         hotkeyProcessed = FALSE;
+        hotkeyPassedThrough = FALSE;
         LOG(L"Switchy %s\n", enabled ? L"enabled" : L"disabled");
         return 1;
       }
 
       if (wParam == WM_KEYDOWN)
       {
-        hotkeyProcessed = TRUE;
+        hotkeyPassedThrough = FALSE;
         if (enabled)
         {
+          // Check whether this window is excluded; if so pass the key through.
+          BOOL ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+          BOOL wouldConvert = (ctrlDown && convertWithCtrl) || (!ctrlDown && smartCaps);
+          if (ShouldExclude(wouldConvert ? FALSE : TRUE))
+          {
+            hotkeyPassedThrough = TRUE;
+            return CallNextHookEx(hHook, nCode, wParam, lParam);
+          }
+          hotkeyProcessed = TRUE;
           // Shift+hotkey: later we synthesize a real key toggle (Caps LED etc.)
           if (shiftProcessed)
             hotkeyOriginalActionRequired = TRUE;
@@ -1052,6 +1064,11 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
       }
       else if (wParam == WM_KEYUP)
       {
+        if (hotkeyPassedThrough)
+        {
+          hotkeyPassedThrough = FALSE;
+          return CallNextHookEx(hHook, nCode, wParam, lParam);
+        }
         hotkeyProcessed = FALSE;
         if (enabled)
         {
