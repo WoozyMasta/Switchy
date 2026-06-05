@@ -5,6 +5,7 @@
  */
 
 #include <Windows.h>
+#include <tlhelp32.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,10 +74,18 @@ int sendMsgTimeoutMs =
 
 WCHAR *excludeSwitch[MAX_EXCLUDE]; ///< Lowercase exe basenames; no layout
                                    ///< switch in these apps.
+BOOL excludeSwitchGlobal[MAX_EXCLUDE]; ///< TRUE = whole-process check (=0),
+                                       ///< FALSE = foreground-window only (=1).
 WCHAR *excludeConvert[MAX_EXCLUDE]; ///< Lowercase exe basenames; no Ctrl
                                     ///< conversion in these apps.
+BOOL excludeConvertGlobal[MAX_EXCLUDE]; ///< Same scope flag for ExcludeConvert.
 int excludeSwitchCount = 0; ///< Number of entries in excludeSwitch.
 int excludeConvertCount = 0; ///< Number of entries in excludeConvert.
+
+int fullScreenExcludeSwitch =
+    0; ///< Bit flags: 1=fullscreen, 2=borderless; suppress layout switch.
+int fullScreenExcludeConvert =
+    0; ///< Bit flags: 1=fullscreen, 2=borderless; suppress conversion.
 
 static WCHAR *clipboardBackup = NULL; ///< Pre-copy CF_UNICODETEXT snapshot;
                                       ///< EmptyClipboard drops other formats.
@@ -139,15 +148,19 @@ static void LowerW(WCHAR *s)
 }
 
 /**
- * @brief Loads INI section keys (before '=') as lowercase basenames into out.
- * @param section Section name.
- * @param out List of strings.
+ * @brief Loads INI section keys as lowercase basenames into out.
+ * @param section  Section name.
+ * @param out      Name list.
  * @param outCount Number of entries in the list.
+ * @param globalOut Per-entry scope flag: TRUE when value is "0"
+ *                  (whole-process check),
+ *                  FALSE for empty/"1" (foreground-window only).
  */
-static void LoadExcludeSection(const WCHAR *section, WCHAR **out, int *outCount)
+static void LoadExcludeSection(const WCHAR *section, WCHAR **out, int *outCount,
+                               BOOL *globalOut)
 {
-  // GetPrivateProfileSectionW returns "key=value\0key2=value2\0\0". Values are
-  // ignored.
+  // GetPrivateProfileSectionW returns "key=value\0key2=value2\0\0".
+  // Value "0" opts into global (whole-process) mode; empty or "1" = per-window.
   WCHAR buf[32768];
   DWORD n = GetPrivateProfileSectionW(section, buf, 32768, iniPath);
   if (n == 0)
@@ -157,6 +170,7 @@ static void LoadExcludeSection(const WCHAR *section, WCHAR **out, int *outCount)
   while (*p && *outCount < MAX_EXCLUDE)
   {
     WCHAR key[260];
+    BOOL isGlobal = FALSE;
     WCHAR *eq = wcschr(p, L'=');
     if (eq)
     {
@@ -165,6 +179,8 @@ static void LoadExcludeSection(const WCHAR *section, WCHAR **out, int *outCount)
         len = 259;
       wmemcpy(key, p, len);
       key[len] = 0;
+      // Value "0" = global mode; anything else (empty, "1", ...) = per-window
+      isGlobal = (eq[1] == L'0' && eq[2] == L'\0');
     }
     else
     {
@@ -174,54 +190,104 @@ static void LoadExcludeSection(const WCHAR *section, WCHAR **out, int *outCount)
     LowerW(key);
     WCHAR *copy = DupW(key);
     if (copy)
+    {
+      globalOut[*outCount] = isGlobal;
       out[(*outCount)++] = copy;
+    }
     p += wcslen(p) + 1;
   }
 }
 
 /**
- * @brief Returns whether the foreground process basename
- *        is in an excludetable.
+ * @brief Returns TRUE if the named process (lowercase basename) is running.
+ * @note Uses a process snapshot; called only for =0 (global-mode) entries.
+ */
+static BOOL IsProcessRunning(const WCHAR *exeName)
+{
+  HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (snap == INVALID_HANDLE_VALUE)
+    return FALSE;
+
+  PROCESSENTRY32W pe;
+  pe.dwSize = sizeof(pe);
+  BOOL found = FALSE;
+
+  if (Process32FirstW(snap, &pe))
+  {
+    do
+    {
+      WCHAR lower[MAX_PATH];
+      wcsncpy(lower, pe.szExeFile, MAX_PATH - 1);
+      lower[MAX_PATH - 1] = 0;
+      LowerW(lower);
+      if (!wcscmp(lower, exeName))
+      {
+        found = TRUE;
+        break;
+      }
+    } while (Process32NextW(snap, &pe));
+  }
+
+  CloseHandle(snap);
+  return found;
+}
+
+/**
+ * @brief Returns whether the active window or a running process matches an
+ *        exclude list entry.
  * @param forSwitch TRUE = ExcludeSwitch, FALSE = ExcludeConvert.
- * @return TRUE if the foreground process basename is in an exclude table.
+ *
+ * Per-entry scope is controlled by the INI value:
+ *   empty / "1" -> check foreground window only (globalList[i] == FALSE)
+ *   "0"         -> check whether the process is running anywhere (global mode)
  */
 static BOOL IsForegroundExcluded(BOOL forSwitch)
 {
   int n = forSwitch ? excludeSwitchCount : excludeConvertCount;
   WCHAR **list = forSwitch ? excludeSwitch : excludeConvert;
+  BOOL *globalList = forSwitch ? excludeSwitchGlobal : excludeConvertGlobal;
   if (n == 0)
     return FALSE;
 
+  // Resolve the foreground window's exe basename once (used by per-window
+  // entries); left empty if the window cannot be queried.
+  WCHAR fgExe[260] = {0};
   HWND w = GetForegroundWindow();
-  if (!w)
-    return FALSE;
-
-  // Resolve full image path and compare basename only (lowercase),
-  // per INI convention
-  DWORD pid = 0;
-  GetWindowThreadProcessId(w, &pid);
-  HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-  if (!h)
-    return FALSE;
-
-  WCHAR path[MAX_PATH * 2];
-  DWORD size = (DWORD)(sizeof(path) / sizeof(path[0]));
-  BOOL ok = QueryFullProcessImageNameW(h, 0, path, &size);
-  CloseHandle(h);
-  if (!ok)
-    return FALSE;
-
-  WCHAR *base = wcsrchr(path, L'\\');
-  base = base ? base + 1 : path;
-  WCHAR lower[260];
-  wcsncpy(lower, base, 259);
-  lower[259] = 0;
-  LowerW(lower);
+  if (w)
+  {
+    DWORD pid = 0;
+    GetWindowThreadProcessId(w, &pid);
+    HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (h)
+    {
+      WCHAR path[MAX_PATH * 2];
+      DWORD size = (DWORD)(sizeof(path) / sizeof(path[0]));
+      if (QueryFullProcessImageNameW(h, 0, path, &size))
+      {
+        WCHAR *base = wcsrchr(path, L'\\');
+        base = base ? base + 1 : path;
+        wcsncpy(fgExe, base, 259);
+        fgExe[259] = 0;
+        LowerW(fgExe);
+      }
+      CloseHandle(h);
+    }
+  }
 
   for (int i = 0; i < n; i++)
   {
-    if (!wcscmp(lower, list[i]))
-      return TRUE;
+    if (globalList[i])
+    {
+      // Global mode (=0): suppress whenever the process is running anywhere.
+      if (IsProcessRunning(list[i]))
+        return TRUE;
+    }
+    else
+    {
+      // Per-window mode (empty/=1): suppress only when its window is active.
+      if (fgExe[0] && !wcscmp(fgExe, list[i]))
+        return TRUE;
+    }
   }
   return FALSE;
 }
@@ -256,8 +322,12 @@ BOOL LoadSettings(void)
 
   FreeExcludeList(excludeSwitch, &excludeSwitchCount);
   FreeExcludeList(excludeConvert, &excludeConvertCount);
-  LoadExcludeSection(L"ExcludeSwitch", excludeSwitch, &excludeSwitchCount);
-  LoadExcludeSection(L"ExcludeConvert", excludeConvert, &excludeConvertCount);
+  memset(excludeSwitchGlobal, 0, sizeof(excludeSwitchGlobal));
+  memset(excludeConvertGlobal, 0, sizeof(excludeConvertGlobal));
+  LoadExcludeSection(L"ExcludeSwitch", excludeSwitch, &excludeSwitchCount,
+                     excludeSwitchGlobal);
+  LoadExcludeSection(L"ExcludeConvert", excludeConvert, &excludeConvertCount,
+                     excludeConvertGlobal);
 
   // Snapshot system layouts once for auto-fill when Layout1/2 are empty in INI
   HKL stackLayouts[SYS_LAYOUTS_STACK_MAX];
@@ -310,6 +380,10 @@ BOOL LoadSettings(void)
     sendMsgTimeoutMs = 10;
   if (sendMsgTimeoutMs > 2000)
     sendMsgTimeoutMs = 2000;
+  fullScreenExcludeSwitch = GetPrivateProfileIntW(
+      L"Settings", L"FullScreenExcludeSwitch", 0, iniPath);
+  fullScreenExcludeConvert = GetPrivateProfileIntW(
+      L"Settings", L"FullScreenExcludeConvert", 0, iniPath);
 
   hLayout1 = NULL;
   if (layoutStr1[0])
@@ -614,6 +688,56 @@ static void SendSyntheticCycleHotkey(void)
 }
 
 /**
+ * @brief Returns TRUE when the foreground window is fullscreen or borderless,
+ *        according to the FullScreenExclude* bit flags.
+ * @param forSwitch TRUE = check FullScreenExcludeSwitch,
+ *                  FALSE = check FullScreenExcludeConvert.
+ *
+ * Bit 1 (0x1): window rect covers the entire monitor (fullscreen).
+ * Bit 2 (0x2): window has no title bar / WS_CAPTION (borderless).
+ */
+static BOOL IsWindowStateExcluded(BOOL forSwitch)
+{
+  int flags = forSwitch ? fullScreenExcludeSwitch : fullScreenExcludeConvert;
+  if (!flags)
+    return FALSE;
+
+  HWND hwnd = GetForegroundWindow();
+  if (!hwnd)
+    return FALSE;
+
+  if (flags & 1)
+  {
+    RECT wr;
+    GetWindowRect(hwnd, &wr);
+    HMONITOR mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi;
+    mi.cbSize = sizeof(mi);
+    if (GetMonitorInfo(mon, &mi) && wr.left == mi.rcMonitor.left &&
+        wr.top == mi.rcMonitor.top && wr.right == mi.rcMonitor.right &&
+        wr.bottom == mi.rcMonitor.bottom)
+      return TRUE;
+  }
+
+  if (flags & 2)
+  {
+    if (!(GetWindowLong(hwnd, GWL_STYLE) & WS_CAPTION))
+      return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * @brief Returns TRUE if the current action should be suppressed.
+ *        Combines list-based and window-state exclusion checks.
+ */
+static BOOL ShouldExclude(BOOL forSwitch)
+{
+  return IsForegroundExcluded(forSwitch) || IsWindowStateExcluded(forSwitch);
+}
+
+/**
  * @brief Activates target HKL for the foreground thread: focus window,
  *        then root, AttachThreadInput, then cycle hotkey.
  * @param target Layout handle to apply.
@@ -622,7 +746,7 @@ static void SwitchToLayoutHKL(HKL target)
 {
   if (!hLayout1 || !hLayout2 || !target)
     return;
-  if (IsForegroundExcluded(TRUE))
+  if (ShouldExclude(TRUE))
     return;
 
   HWND hwnd = GetForegroundWindow();
@@ -780,7 +904,7 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
   if (kind == ConvertInput_SyntheticCtrl && !smartCaps)
     return;
 
-  if (IsForegroundExcluded(FALSE))
+  if (ShouldExclude(FALSE))
   {
     if (switchLayoutOnEmpty)
       SwitchToSpecificLayout();
@@ -876,7 +1000,7 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
 
   RestoreUnicodeClipboard();
 
-  if (!IsForegroundExcluded(TRUE))
+  if (!ShouldExclude(TRUE))
     SwitchToLayoutHKL(to);
 }
 

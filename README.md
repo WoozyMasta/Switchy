@@ -116,26 +116,40 @@ SmartCaps=0
 FallbackCycleHotkey=0
 
 ; Timeout (ms) for the SendMessageTimeout layout-switch request.
-; Lower values reduce first-letter lag on fast typing. Range: 10–2000.
+; Lower values reduce first-letter lag on fast typing. Range: 10-2000.
 SwitchTimeoutMs=80
+
+; Suppress layout switch for fullscreen / borderless foreground windows (games).
+; Bit flags: 0 = off, 1 = fullscreen (default), 2 = borderless (no title bar), 3 = both.
+FullScreenExcludeSwitch=1
+
+; Same flags for text conversion (Ctrl+SwitchKey / SmartCaps).
+FullScreenExcludeConvert=1
 ```
 
 ### Optional: exclude processes
 
-Use **only the key** (executable file name, lower case in memory).
-Values are ignored.
+`ExcludeSwitch` disables layout switching;  
+`ExcludeConvert` disables the Ctrl+SwitchKey conversion.  
+Listing an exe in both disables both behaviors for that process.
+
+The **value** controls the scope of suppression:
+
+* _(empty)_ or `1` - Suppress only when this app's window is active (default)
+* `0` - Suppress whenever this process is running anywhere (global)
 
 ```ini
 [ExcludeSwitch]
-notepad.exe=
+; Suppress layout switch when the app window is active (default per-window mode):
+SomeApp.exe=
+; Same, explicit:
+SomeApp.exe=1
+; Suppress layout switch whenever the app is running, even in background:
+SomeApp.exe=0
 
 [ExcludeConvert]
-SomeGame.exe=
+SomeApp.exe=
 ```
-
-`ExcludeSwitch` disables layout switching. `ExcludeConvert` disables the
-Ctrl+SwitchKey conversion. Listing an exe in **both** disables both behaviors
-for that process.
 
 ### Limitations
 
@@ -180,7 +194,7 @@ This fork uses standard C API and does not require Visual Studio.
 You can build it using **GCC (MinGW)**.
 
 ```bash
-make          # clean → test → build → msi
+make          # clean -> test -> build -> msi
 make build    # exe only
 make test     # unit tests
 make msi      # MSI installer (requires WiX 7: dotnet tool install --global wix)
