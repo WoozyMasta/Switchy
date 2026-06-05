@@ -10,7 +10,7 @@ in a configuration file.
 Pressing the key will instantly toggle between them,
 ignoring any other layouts installed on the system.
 
-![switchy](switchy.jpg)
+![switchy]
 
 Layout switching targets the **focused** control when possible
 (`GetGUIThreadInfo` + `SendMessageTimeout` with `WM_INPUTLANGCHANGEREQUEST`),
@@ -21,8 +21,18 @@ It still does not show the Windows 10/11 language pop-up by default.
 
 ## Usage
 
-1. Download `switchy.exe` and `switchy.ini` from the
-   [Releases](https://github.com/WoozyMasta/Switchy/releases/latest) page.
+### MSI installer (recommended)
+
+1. Download `switchy.msi` from the [Releases] page.
+1. Run the installer - Switchy is placed in `%ProgramFiles%\Switchy\`
+   and registered for autostart via the current user's Run key.
+1. The application starts automatically once the installation is complete.
+
+To configure, edit `switchy.ini` in `%ProgramFiles%\Switchy\` (see below).
+
+### Manual install
+
+1. Download `switchy.exe` and `switchy.ini` from the [Releases] page.
 1. Place them in the same folder.
 1. Configure `switchy.ini` (see below).
 1. Run `switchy.exe`.
@@ -51,7 +61,10 @@ It still does not show the Windows 10/11 language pop-up by default.
 
 ### Auto-start
 
-To run Switchy automatically:
+The **MSI installer** registers autostart automatically
+(`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
+
+For a **manual install**, add Switchy to the startup folder:
 
 1. Press **Win+R**, type `shell:startup`, and press Enter.
 1. Create a shortcut to `switchy.exe` in that folder.
@@ -98,6 +111,10 @@ SmartCaps=0
 ; If the normal layout request fails: 0 = none, 1 = Alt+Shift cycle, 2 = Ctrl+Shift cycle,
 ; 3 = Win+Space (language bar). Your Windows "switch input language" hotkey may differ.
 FallbackCycleHotkey=0
+
+; Timeout (ms) for the SendMessageTimeout layout-switch request.
+; Lower values reduce first-letter lag on fast typing. Range: 10–2000.
+SwitchTimeoutMs=80
 ```
 
 ### Optional: exclude processes
@@ -141,15 +158,15 @@ You need the **Input Locale Identifier** (HKL) for your desired languages.
    Copy the folder name (e.g., `00000409`).
 1. **Microsoft Docs:**
    You can look up Language Identifiers here:
-   [Language Identifier Constants and Strings](https://learn.microsoft.com/en-us/windows/win32/intl/language-identifier-constants-and-strings),
-   [Windows Language Code Identifier (LCID) Reference](https://winprotocoldoc.z19.web.core.windows.net/MS-LCID/%5bMS-LCID%5d-210625.pdf)
+   [Language Identifier Constants and Strings][language-identifier],
+   [Windows Language Code Identifier (LCID) Reference][LCID]
    You usually need the last 4 digits padded with zeros
    (e.g., `0x0409` -> `00000409`).
 
 ### How to find Key Codes?
 
 If you want to use a key other than Caps Lock, you need its
-[Microsoft Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes).
+[Microsoft Virtual-Key Codes][virtual-key-codes].
 
 **Example**: If you want to use **Right Alt**, the constant is `VK_RMENU`,
 the value is `0xA5` (Hex), which is `165` in Decimal.
@@ -160,7 +177,17 @@ This fork uses standard C API and does not require Visual Studio.
 You can build it using **GCC (MinGW)**.
 
 ```bash
-make
-# or
+make          # clean → test → build → msi
+make build    # exe only
+make test     # unit tests
+make msi      # MSI installer (requires WiX 7: dotnet tool install --global wix)
+# or manually:
 gcc switchy.c charmap.c -o switchy.exe -mwindows -O2 -std=c99 -luser32 -lkernel32
 ```
+
+<!-- Links -->
+[Releases]: https://github.com/WoozyMasta/Switchy/releases/latest
+[switchy]: switchy.jpg
+[language-identifier]: https://learn.microsoft.com/en-us/windows/win32/intl/language-identifier-constants-and-strings
+[LCID]: https://winprotocoldoc.z19.web.core.windows.net/MS-LCID/%5bMS-LCID%5d-210625.pdf
+[virtual-key-codes]: https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
