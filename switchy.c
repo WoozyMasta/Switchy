@@ -26,7 +26,7 @@
 #endif
 
 #define MAX_EXCLUDE 128                     ///< Max executable basenames per ExcludeSwitch / ExcludeConvert.
-#define SENDMSG_TIMEOUT_MS 200              ///< Timeout for SendMessageTimeout layout requests (ms).
+#define SENDMSG_TIMEOUT_MS_DEFAULT 80       ///< Default timeout for SendMessageTimeout layout requests (ms).
 #define CLIPBOARD_MAX_WCHARS (1024 * 1024)  ///< Max WCHAR count for clipboard backup/convert (~2 MiB).
 #define CLIPBOARD_POST_COPY_DELAY_MS 40     ///< After synthetic Ctrl+C, wait for CF_UNICODETEXT.
 #define CLIPBOARD_POST_PASTE_DELAY_MS 30    ///< After paste, before restoring prior clipboard.
@@ -53,6 +53,7 @@ BOOL shiftProcessed = FALSE; ///< Shift held (passthrough Caps).
 BOOL convertWithCtrl = TRUE; ///< INI: Ctrl+switch runs conversion when TRUE.
 BOOL smartCaps = FALSE; ///< INI: plain switch may run synthetic Ctrl+C conversion.
 int fallbackCycleHotkey = 0; ///< 0=none, 1=Alt+Shift, 2=Ctrl+Shift, 3=Win+Space.
+int sendMsgTimeoutMs = SENDMSG_TIMEOUT_MS_DEFAULT; ///< INI: SwitchTimeoutMs — SendMessageTimeout for layout requests.
 
 WCHAR *excludeSwitch[MAX_EXCLUDE]; ///< Lowercase exe basenames; no layout switch in these apps.
 WCHAR *excludeConvert[MAX_EXCLUDE]; ///< Lowercase exe basenames; no Ctrl conversion in these apps.
@@ -272,6 +273,9 @@ BOOL LoadSettings(void)
   convertWithCtrl = GetPrivateProfileIntW(L"Settings", L"ConvertWithCtrl", 1, iniPath) != 0;
   smartCaps = GetPrivateProfileIntW(L"Settings", L"SmartCaps", 0, iniPath) != 0;
   fallbackCycleHotkey = GetPrivateProfileIntW(L"Settings", L"FallbackCycleHotkey", 0, iniPath);
+  sendMsgTimeoutMs = GetPrivateProfileIntW(L"Settings", L"SwitchTimeoutMs", SENDMSG_TIMEOUT_MS_DEFAULT, iniPath);
+  if (sendMsgTimeoutMs < 10) sendMsgTimeoutMs = 10;
+  if (sendMsgTimeoutMs > 2000) sendMsgTimeoutMs = 2000;
 
   hLayout1 = NULL;
   if (layoutStr1[0])
@@ -588,13 +592,13 @@ static void SwitchToLayoutHKL(HKL target)
 
   DWORD_PTR smres = 0;
   SendMessageTimeoutW(hwndTarget, WM_INPUTLANGCHANGEREQUEST, 0, (LPARAM)target, SMTO_ABORTIFHUNG,
-                      SENDMSG_TIMEOUT_MS, &smres);
+                      (UINT)sendMsgTimeoutMs, &smres);
 
   // Some hosts only route layout changes through the root window
   if (GetKeyboardLayout(tid) != target && hwndTarget != hwnd)
   {
     SendMessageTimeoutW(hwnd, WM_INPUTLANGCHANGEREQUEST, 0, (LPARAM)target, SMTO_ABORTIFHUNG,
-                        SENDMSG_TIMEOUT_MS, &smres);
+                        (UINT)sendMsgTimeoutMs, &smres);
   }
 
   // Last API attempt: same-thread input attach lets ActivateKeyboardLayout hit the foreign queue
