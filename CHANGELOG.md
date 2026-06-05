@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning][].
 * Shipped `switchy.ini` now has `Layout1` and `Layout2` empty by default,
   so auto-detection of system layouts is used out of the box
   instead of hardcoded codes.
+* MSI installer no longer overwrites an existing `switchy.ini` on upgrade
+  or reinstall, preserving user settings. The file is also kept on uninstall.
 
 [2.3.0]: https://github.com/WoozyMasta/Switchy/compare/2.2.0...2.3.0
 

@@ -48,7 +48,8 @@
       <File Id="SwitchyExe" Source="switchy.exe" KeyPath="yes" />
     </Component>
 
-    <Component Id="DefaultConfig" Directory="INSTALLDIR">
+    <Component Id="DefaultConfig" Directory="INSTALLDIR"
+               NeverOverwrite="yes" Permanent="yes">
       <File Id="SwitchyIni" Source="switchy.ini" KeyPath="yes" />
     </Component>
 
