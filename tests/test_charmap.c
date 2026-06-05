@@ -1,11 +1,11 @@
 /**
  * @file test_charmap.c
- * @brief Unit tests for charmap.c - Switchy_BuildCharMaps and Switchy_ConvertString.
+ * @brief Unit tests for charmap.c -
+ *        Switchy_BuildCharMaps and Switchy_ConvertString.
  *
  * Build (no -mwindows; console output needed):
- *   gcc charmap.c tests/test_charmap.c -o tests/test_charmap.exe -O0 -std=c99 -Wall -luser32 -lkernel32
- * Run:
- *   tests/test_charmap.exe
+ *   gcc charmap.c tests/test_charmap.c -o tests/test_charmap.exe -O0 -std=c99
+ * -Wall -luser32 -lkernel32 Run: tests/test_charmap.exe
  */
 
 #include "../charmap.h"
@@ -13,26 +13,34 @@
 #include <string.h>
 #include <wchar.h>
 
-static int s_passed  = 0;
-static int s_failed  = 0;
+static int s_passed = 0;
+static int s_failed = 0;
 static int s_skipped = 0;
 
-#define ASSERT(cond, msg)                                                         \
-  do {                                                                            \
-    if (cond) {                                                                   \
-      s_passed++;                                                                 \
-    } else {                                                                      \
-      s_failed++;                                                                 \
-      printf("FAIL  %s:%d  %s\n", __FILE__, __LINE__, msg);                      \
-    }                                                                             \
+#define ASSERT(cond, msg)                                                      \
+  do                                                                           \
+  {                                                                            \
+    if (cond)                                                                  \
+    {                                                                          \
+      s_passed++;                                                              \
+    }                                                                          \
+    else                                                                       \
+    {                                                                          \
+      s_failed++;                                                              \
+      printf("FAIL  %s:%d  %s\n", __FILE__, __LINE__, msg);                    \
+    }                                                                          \
   } while (0)
 
-#define ASSERT_EQ(a, b, msg)    ASSERT((a) == (b), msg)
-#define ASSERT_NEQ(a, b, msg)   ASSERT((a) != (b), msg)
+#define ASSERT_EQ(a, b, msg) ASSERT((a) == (b), msg)
+#define ASSERT_NEQ(a, b, msg) ASSERT((a) != (b), msg)
 #define ASSERT_WSTREQ(a, b, msg) ASSERT(wcscmp((a), (b)) == 0, msg)
 
-#define SKIP(msg)                                                                 \
-  do { s_skipped++; printf("SKIP  %s\n", msg); } while (0)
+#define SKIP(msg)                                                              \
+  do                                                                           \
+  {                                                                            \
+    s_skipped++;                                                               \
+    printf("SKIP  %s\n", msg);                                                 \
+  } while (0)
 
 static void test_convert_null_hkls(void)
 {
@@ -46,7 +54,7 @@ static void test_convert_null_hkls(void)
 static void test_convert_empty_string(void)
 {
   Switchy_BuildCharMaps(NULL, NULL);
-  WCHAR out[8] = {0x1234, 0};  /* pre-fill to detect stale write */
+  WCHAR out[8] = {0x1234, 0}; /* pre-fill to detect stale write */
   Switchy_ConvertString(L"", 0, out, 8, NULL, NULL);
   ASSERT_EQ(out[0], 0, "Empty string: out[0] is NUL");
 }
@@ -81,7 +89,8 @@ static void test_convert_unknown_pair_identity(void)
 
 static void test_convert_equal_hkls_noop(void)
 {
-  /* Equal HKLs -> BuildCharMaps is a no-op; ConvertString should return identity */
+  /* Equal HKLs -> BuildCharMaps is a no-op; ConvertString should return
+   * identity */
   HKL h = (HKL)(size_t)0xCAFE;
   Switchy_BuildCharMaps(h, h);
   WCHAR out[16] = {0};
@@ -149,9 +158,11 @@ static void test_layout_specific(HKL hEN, HKL hRU)
 
   /* Mixed text: Cyrillic + ASCII punctuation RU->EN */
   /* "привет," - comma should survive as ',' not '?' */
-  const WCHAR mixed[] = {0x043f, 0x0440, 0x0438, 0x0432, 0x0435, 0x0442, L',', 0};
+  const WCHAR mixed[] = {0x043f, 0x0440, 0x0438, 0x0432,
+                         0x0435, 0x0442, L',',   0};
   Switchy_ConvertString(mixed, wcslen(mixed), out, 64, hRU, hEN);
-  ASSERT_EQ(out[wcslen(out) - 1], L',', "Mixed RU->EN: trailing comma preserved");
+  ASSERT_EQ(out[wcslen(out) - 1], L',',
+            "Mixed RU->EN: trailing comma preserved");
 }
 
 int main(void)
@@ -173,16 +184,19 @@ int main(void)
 
   if (!hEN || !hRU)
   {
-    SKIP("EN or RU keyboard layout not installed - skipping layout-specific tests");
-    if (!hEN) SKIP("  missing: 00000409 (English US)");
-    if (!hRU) SKIP("  missing: 00000419 (Russian)");
+    SKIP("EN or RU keyboard layout not installed - skipping layout-specific "
+         "tests");
+    if (!hEN)
+      SKIP("  missing: 00000409 (English US)");
+    if (!hRU)
+      SKIP("  missing: 00000419 (Russian)");
   }
   else
   {
     test_layout_specific(hEN, hRU);
   }
 
-  printf("\n=== Results: %d passed, %d failed, %d skipped ===\n",
-         s_passed, s_failed, s_skipped);
+  printf("\n=== Results: %d passed, %d failed, %d skipped ===\n", s_passed,
+         s_failed, s_skipped);
   return s_failed > 0 ? 1 : 0;
 }

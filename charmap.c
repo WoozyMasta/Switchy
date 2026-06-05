@@ -7,10 +7,12 @@
 #include <string.h>
 
 #ifndef TO_UNICODE_NO_KEYBOARD_STATE_MUTATION
-#define TO_UNICODE_NO_KEYBOARD_STATE_MUTATION 0x4 ///< ToUnicodeEx: do not mutate global keyboard state (Win10 1607+).
+#define TO_UNICODE_NO_KEYBOARD_STATE_MUTATION                                  \
+  0x4 ///< ToUnicodeEx: do not mutate global keyboard state (Win10 1607+).
 #endif
 
-static WCHAR g_map_l1_to_l2[65536]; ///< L1->L2: UTF-16 index -> mapped char; 0 means no mapping stored.
+static WCHAR g_map_l1_to_l2[65536]; ///< L1->L2: UTF-16 index -> mapped char;
+                                    ///< 0 means no mapping stored.
 static WCHAR g_map_l2_to_l1[65536]; ///< L2->L1 reverse map.
 
 static HKL g_h1; ///< Layout handle from last Switchy_BuildCharMaps (first).
@@ -34,9 +36,11 @@ static void SetKeyStateEmpty(BYTE ks[256])
 }
 
 /**
- * @brief Sets modifier bits in a keyboard state for one of six fixed combinations (Shift / AltGr / ...).
+ * @brief Sets modifier bits in a keyboard state
+ *        for one of six fixed combinations (Shift / AltGr / ...).
  * @param ks Output keyboard state.
- * @param stateIdx 0=none, 1=Shift, 2=Ctrl, 3=Shift+Ctrl, 4=Alt, 5=Ctrl+Alt (AltGr-style).
+ * @param stateIdx 0=none, 1=Shift, 2=Ctrl, 3=Shift+Ctrl, 4=Alt, 5=Ctrl+Alt
+ *        (AltGr-style).
  */
 static void ApplyStateIndex(BYTE ks[256], int stateIdx)
 {
@@ -69,7 +73,8 @@ static void ApplyStateIndex(BYTE ks[256], int stateIdx)
 }
 
 /**
- * @brief Builds BMP char maps from ToUnicodeEx for each VK x modifier slice; see charmap.h.
+ * @brief Builds BMP char maps from ToUnicodeEx for each VK x modifier slice;
+ *        see charmap.h.
  */
 void Switchy_BuildCharMaps(HKL h1, HKL h2)
 {
@@ -100,7 +105,8 @@ void Switchy_BuildCharMaps(HKL h1, HKL h2)
       int n1 = ToUnicodeEx(vk, scan, keyState, buf1, 8, wFlags, h1);
       int n2 = ToUnicodeEx(vk, scan, keyState, buf2, 8, wFlags, h2);
 
-      // Negative n: dead-key state. n > 1: surrogate/combining; skip for simple BMP map.
+      // Negative n: dead-key state. n > 1: surrogate/combining; skip for simple
+      // BMP map.
       if (n1 < 0 || n2 < 0)
         continue;
       if (n1 == 1 && n2 == 1 && buf1[0] != 0 && buf2[0] != 0)
@@ -118,10 +124,10 @@ void Switchy_BuildCharMaps(HKL h1, HKL h2)
 
   // Remove reverse-map entries for code points that appear in both maps.
   // A character "native" to L1 (has a forward L1->L2 entry) should pass through
-  // unchanged when encountered in L2->L1 conversion rather than being remapped to
-  // a different L1 key.  This prevents ASCII punctuation shared by both layouts
-  // (e.g. '.' and ',' which sit on different physical keys in EN vs RU) from
-  // being corrupted when converting mixed-layout text.
+  // unchanged when encountered in L2->L1 conversion rather than being remapped
+  // to a different L1 key.  This prevents ASCII punctuation shared by both
+  // layouts (e.g. '.' and ',' which sit on different physical keys in EN vs RU)
+  // from being corrupted when converting mixed-layout text.
   for (int c = 1; c < 65536; c++)
   {
     if (g_map_l1_to_l2[c] != 0 && g_map_l2_to_l1[c] != 0)
@@ -132,7 +138,8 @@ void Switchy_BuildCharMaps(HKL h1, HKL h2)
 /**
  * @copydoc Switchy_ConvertString
  */
-void Switchy_ConvertString(const WCHAR *in, size_t inLen, WCHAR *out, size_t outMax, HKL from, HKL to)
+void Switchy_ConvertString(const WCHAR *in, size_t inLen, WCHAR *out,
+                           size_t outMax, HKL from, HKL to)
 {
   if (!out || outMax == 0)
     return;
@@ -146,7 +153,8 @@ void Switchy_ConvertString(const WCHAR *in, size_t inLen, WCHAR *out, size_t out
     map_fwd = g_map_l2_to_l1;
   else
   {
-    // No built map for this pair: identity (caller should align layouts with LoadSettings).
+    // No built map for this pair: identity
+    // (caller should align layouts with LoadSettings).
     for (size_t i = 0; i < inLen; i++)
       out[i] = in[i];
     out[inLen] = 0;

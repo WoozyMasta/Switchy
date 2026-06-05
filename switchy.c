@@ -1,6 +1,7 @@
 /**
  * @file switchy.c
- * @brief Keyboard hook, layout switching, and optional clipboard-based layout conversion.
+ * @brief Keyboard hook, layout switching,
+ *        and optional clipboard-based layout conversion.
  */
 
 #define _CRT_SECURE_NO_WARNINGS
@@ -14,23 +15,33 @@
 #include "charmap.h"
 
 #ifndef WM_INPUTLANGCHANGEREQUEST
-#define WM_INPUTLANGCHANGEREQUEST 0x0050 ///< WinUser: request input language change for a thread.
+#define WM_INPUTLANGCHANGEREQUEST                                              \
+  0x0050 ///< WinUser: request input language change for a thread.
 #endif
 
 #ifndef TO_UNICODE_NO_KEYBOARD_STATE_MUTATION
-#define TO_UNICODE_NO_KEYBOARD_STATE_MUTATION 0x4 ///< ToUnicodeEx: do not mutate global keyboard state (Win10 1607+).
+#define TO_UNICODE_NO_KEYBOARD_STATE_MUTATION                                  \
+  0x4 ///< ToUnicodeEx: do not mutate global keyboard state (Win10 1607+).
 #endif
 
 #ifndef WM_SWITCHY_DEFER
-#define WM_SWITCHY_DEFER (WM_APP + 0x100) ///< Thread message: run TryConvertSelection outside WH_KEYBOARD_LL.
+#define WM_SWITCHY_DEFER                                                       \
+  (WM_APP +                                                                    \
+   0x100) ///< Thread message: run TryConvertSelection outside WH_KEYBOARD_LL.
 #endif
 
-#define MAX_EXCLUDE 128                     ///< Max executable basenames per ExcludeSwitch / ExcludeConvert.
-#define SENDMSG_TIMEOUT_MS_DEFAULT 80       ///< Default timeout for SendMessageTimeout layout requests (ms).
-#define CLIPBOARD_MAX_WCHARS (1024 * 1024)  ///< Max WCHAR count for clipboard backup/convert (~2 MiB).
-#define CLIPBOARD_POST_COPY_DELAY_MS 40     ///< After synthetic Ctrl+C, wait for CF_UNICODETEXT.
-#define CLIPBOARD_POST_PASTE_DELAY_MS 30    ///< After paste, before restoring prior clipboard.
-#define SYS_LAYOUTS_STACK_MAX 64            ///< Stack buffer for GetKeyboardLayoutList (avoids malloc when enough).
+#define MAX_EXCLUDE                                                            \
+  128 ///< Max executable basenames per ExcludeSwitch / ExcludeConvert.
+#define SENDMSG_TIMEOUT_MS_DEFAULT                                             \
+  80 ///< Default timeout for SendMessageTimeout layout requests (ms).
+#define CLIPBOARD_MAX_WCHARS                                                   \
+  (1024 * 1024) ///< Max WCHAR count for clipboard backup/convert (~2 MiB).
+#define CLIPBOARD_POST_COPY_DELAY_MS                                           \
+  40 ///< After synthetic Ctrl+C, wait for CF_UNICODETEXT.
+#define CLIPBOARD_POST_PASTE_DELAY_MS                                          \
+  30 ///< After paste, before restoring prior clipboard.
+#define SYS_LAYOUTS_STACK_MAX                                                  \
+  64 ///< Stack buffer for GetKeyboardLayoutList (avoids malloc when enough).
 
 /**
  * @name Global configuration (set by LoadSettings)
@@ -39,33 +50,43 @@
 
 HKL hLayout1 = NULL; ///< First layout handle from INI or auto-detected.
 HKL hLayout2 = NULL; ///< Second layout handle from INI or auto-detected.
-UINT hotkeyVkCode = VK_CAPITAL; ///< Virtual key for layout switch (default Caps Lock).
+UINT hotkeyVkCode = VK_CAPITAL; ///< Virtual key for layout switch.
 WCHAR iniPath[MAX_PATH]; ///< Full path to switchy.ini beside the executable.
 
 HHOOK hHook; ///< Low-level keyboard hook instance.
 BOOL enabled = TRUE; ///< Master enable; Alt+hotkey toggles enabled state.
 
-BOOL appSwitchRequired = FALSE; ///< Alt went down while hotkey active: next Alt keyup toggles enabled.
-BOOL hotkeyOriginalActionRequired = FALSE; ///< Shift+hotkey: later inject real key press (e.g. Caps LED).
+BOOL appSwitchRequired = FALSE; ///< Alt went down while hotkey active:
+                                ///< next Alt keyup toggles enabled.
+BOOL hotkeyOriginalActionRequired =
+    FALSE; ///< Shift+hotkey: later inject real key press (e.g. Caps LED).
 BOOL hotkeyProcessed = FALSE; ///< Hotkey currently held (Alt/Shift context).
 BOOL shiftProcessed = FALSE; ///< Shift held (passthrough Caps).
 
 BOOL convertWithCtrl = TRUE; ///< INI: Ctrl+switch runs conversion when TRUE.
-BOOL smartCaps = FALSE; ///< INI: plain switch may run synthetic Ctrl+C conversion.
-int fallbackCycleHotkey = 0; ///< 0=none, 1=Alt+Shift, 2=Ctrl+Shift, 3=Win+Space.
-int sendMsgTimeoutMs = SENDMSG_TIMEOUT_MS_DEFAULT; ///< INI: SwitchTimeoutMs - SendMessageTimeout for layout requests.
+BOOL smartCaps =
+    FALSE; ///< INI: plain switch may run synthetic Ctrl+C conversion.
+int fallbackCycleHotkey =
+    0; ///< 0=none, 1=Alt+Shift, 2=Ctrl+Shift, 3=Win+Space.
+int sendMsgTimeoutMs =
+    SENDMSG_TIMEOUT_MS_DEFAULT; ///< INI: SwitchTimeoutMs -
+                                ///< SendMessageTimeout for layout requests.
 
-WCHAR *excludeSwitch[MAX_EXCLUDE]; ///< Lowercase exe basenames; no layout switch in these apps.
-WCHAR *excludeConvert[MAX_EXCLUDE]; ///< Lowercase exe basenames; no Ctrl conversion in these apps.
+WCHAR *excludeSwitch[MAX_EXCLUDE]; ///< Lowercase exe basenames; no layout
+                                   ///< switch in these apps.
+WCHAR *excludeConvert[MAX_EXCLUDE]; ///< Lowercase exe basenames; no Ctrl
+                                    ///< conversion in these apps.
 int excludeSwitchCount = 0; ///< Number of entries in excludeSwitch.
 int excludeConvertCount = 0; ///< Number of entries in excludeConvert.
 
-static WCHAR *clipboardBackup = NULL; ///< Pre-copy CF_UNICODETEXT snapshot; EmptyClipboard drops other formats.
+static WCHAR *clipboardBackup = NULL; ///< Pre-copy CF_UNICODETEXT snapshot;
+                                      ///< EmptyClipboard drops other formats.
 
 /** @} */
 
 #if _DEBUG
-#define LOG(...) wprintf(__VA_ARGS__) ///< Debug: print wide messages to the console.
+#define LOG(...)                                                               \
+  wprintf(__VA_ARGS__) ///< Debug: print wide messages to the console.
 #else
 #define LOG(...)
 #endif
@@ -126,7 +147,8 @@ static void LowerW(WCHAR *s)
  */
 static void LoadExcludeSection(const WCHAR *section, WCHAR **out, int *outCount)
 {
-  // GetPrivateProfileSectionW returns "key=value\0key2=value2\0\0". Values are ignored.
+  // GetPrivateProfileSectionW returns "key=value\0key2=value2\0\0". Values are
+  // ignored.
   WCHAR buf[32768];
   DWORD n = GetPrivateProfileSectionW(section, buf, 32768, iniPath);
   if (n == 0)
@@ -159,7 +181,8 @@ static void LoadExcludeSection(const WCHAR *section, WCHAR **out, int *outCount)
 }
 
 /**
- * @brief Returns whether the foreground process basename is in an exclude table.
+ * @brief Returns whether the foreground process basename
+ *        is in an excludetable.
  * @param forSwitch TRUE = ExcludeSwitch, FALSE = ExcludeConvert.
  * @return TRUE if the foreground process basename is in an exclude table.
  */
@@ -174,7 +197,8 @@ static BOOL IsForegroundExcluded(BOOL forSwitch)
   if (!w)
     return FALSE;
 
-  // Resolve full image path and compare basename only (lowercase), per INI convention
+  // Resolve full image path and compare basename only (lowercase),
+  // per INI convention
   DWORD pid = 0;
   GetWindowThreadProcessId(w, &pid);
   HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
@@ -204,8 +228,10 @@ static BOOL IsForegroundExcluded(BOOL forSwitch)
 }
 
 /**
- * @brief Reads switchy.ini next to the executable and fills globals and char maps.
- * @return FALSE if both layouts could not be resolved (caller must not install the hook).
+ * @brief Reads switchy.ini next to the executable
+ *        and fills globals and char maps.
+ * @return FALSE if both layouts could not be resolved
+ *         (caller must not installthe hook).
  */
 BOOL LoadSettings(void)
 {
@@ -216,7 +242,8 @@ BOOL LoadSettings(void)
     return FALSE;
   }
 
-  // Strip exe name so iniPath is the directory (shortcuts still resolve to real exe dir)
+  // Strip exe name so iniPath is the directory
+  // (shortcuts still resolve to real exe dir)
   WCHAR *lastSlash = wcsrchr(exePath, L'\\');
   if (lastSlash)
     *lastSlash = 0;
@@ -263,19 +290,27 @@ BOOL LoadSettings(void)
     }
   }
 
-  WCHAR layoutStr1[KL_NAMELENGTH] = { 0 };
-  WCHAR layoutStr2[KL_NAMELENGTH] = { 0 };
+  WCHAR layoutStr1[KL_NAMELENGTH] = {0};
+  WCHAR layoutStr2[KL_NAMELENGTH] = {0};
 
-  GetPrivateProfileStringW(L"Settings", L"Layout1", L"", layoutStr1, KL_NAMELENGTH, iniPath);
-  GetPrivateProfileStringW(L"Settings", L"Layout2", L"", layoutStr2, KL_NAMELENGTH, iniPath);
+  GetPrivateProfileStringW(L"Settings", L"Layout1", L"", layoutStr1,
+                           KL_NAMELENGTH, iniPath);
+  GetPrivateProfileStringW(L"Settings", L"Layout2", L"", layoutStr2,
+                           KL_NAMELENGTH, iniPath);
 
-  hotkeyVkCode = (UINT)GetPrivateProfileIntW(L"Settings", L"SwitchKey", VK_CAPITAL, iniPath);
-  convertWithCtrl = GetPrivateProfileIntW(L"Settings", L"ConvertWithCtrl", 1, iniPath) != 0;
+  hotkeyVkCode = (UINT)GetPrivateProfileIntW(L"Settings", L"SwitchKey",
+                                             VK_CAPITAL, iniPath);
+  convertWithCtrl =
+      GetPrivateProfileIntW(L"Settings", L"ConvertWithCtrl", 1, iniPath) != 0;
   smartCaps = GetPrivateProfileIntW(L"Settings", L"SmartCaps", 0, iniPath) != 0;
-  fallbackCycleHotkey = GetPrivateProfileIntW(L"Settings", L"FallbackCycleHotkey", 0, iniPath);
-  sendMsgTimeoutMs = GetPrivateProfileIntW(L"Settings", L"SwitchTimeoutMs", SENDMSG_TIMEOUT_MS_DEFAULT, iniPath);
-  if (sendMsgTimeoutMs < 10) sendMsgTimeoutMs = 10;
-  if (sendMsgTimeoutMs > 2000) sendMsgTimeoutMs = 2000;
+  fallbackCycleHotkey =
+      GetPrivateProfileIntW(L"Settings", L"FallbackCycleHotkey", 0, iniPath);
+  sendMsgTimeoutMs = GetPrivateProfileIntW(L"Settings", L"SwitchTimeoutMs",
+                                           SENDMSG_TIMEOUT_MS_DEFAULT, iniPath);
+  if (sendMsgTimeoutMs < 10)
+    sendMsgTimeoutMs = 10;
+  if (sendMsgTimeoutMs > 2000)
+    sendMsgTimeoutMs = 2000;
 
   hLayout1 = NULL;
   if (layoutStr1[0])
@@ -291,7 +326,8 @@ BOOL LoadSettings(void)
     hLayout2 = LoadKeyboardLayoutW(layoutStr2, KLF_NOTELLSHELL);
   if (!hLayout2 && sysLayouts && sysCount > 0)
   {
-    // If only one system layout exists, both Switchy slots may point to it until user adds another
+    // If only one system layout exists,
+    // both Switchy slots may point to it until user adds another
     hLayout2 = (sysCount > 1) ? sysLayouts[1] : sysLayouts[0];
     LOG(L"Layout2 auto-detected: %p\n", hLayout2);
   }
@@ -301,12 +337,14 @@ BOOL LoadSettings(void)
 
   if (!hLayout1 || !hLayout2)
   {
-    ShowErrorW(L"Could not determine layouts. Check switchy.ini or system settings.");
+    ShowErrorW(
+        L"Could not determine layouts. Check switchy.ini or system settings.");
     return FALSE;
   }
 
   Switchy_BuildCharMaps(hLayout1, hLayout2);
-  LOG(L"Config: L1=%p L2=%p Hotkey=%u SmartCaps=%d\n", hLayout1, hLayout2, hotkeyVkCode, smartCaps);
+  LOG(L"Config: L1=%p L2=%p Hotkey=%u SmartCaps=%d\n", hLayout1, hLayout2,
+      hotkeyVkCode, smartCaps);
   return TRUE;
 }
 
@@ -322,23 +360,27 @@ static void FreeClipboardBackup(void)
 /**
  * @brief Result of snapshotting CF_UNICODETEXT before a synthetic copy.
  */
-typedef enum {
+typedef enum
+{
   BackupCb_OK, ///< Unicode text captured (may be empty string).
   BackupCb_NoText, ///< No CF_UNICODETEXT or empty handle.
   BackupCb_TooLarge, ///< Exceeds CLIPBOARD_MAX_WCHARS.
   BackupCb_OpenFailed ///< OpenClipboard failed.
 } BackupCbResult;
 
-typedef enum {
+typedef enum
+{
   ClipCopy_OK,
   ClipCopy_TooLarge,
   ClipCopy_AllocFail
 } ClipCopyResult;
 
 /**
- * @brief Copies bounded UTF-16 from a CF_UNICODETEXT global (caller holds clipboard open).
+ * @brief Copies bounded UTF-16 from a CF_UNICODETEXT global
+ *        (caller holds clipboard open).
  */
-static ClipCopyResult CopyBoundedUnicodeFromHGlobal(HANDLE hMem, WCHAR **out, size_t *outLen)
+static ClipCopyResult CopyBoundedUnicodeFromHGlobal(HANDLE hMem, WCHAR **out,
+                                                    size_t *outLen)
 {
   *out = NULL;
   *outLen = 0;
@@ -402,7 +444,8 @@ static BackupCbResult BackupUnicodeClipboard(void)
 
 /**
  * @brief Replaces clipboard with a single CF_UNICODETEXT block.
- * @param s Null-terminated Unicode string (owns nothing; copied into global alloc).
+ * @param s Null-terminated Unicode string
+ *        (owns nothing; copied into global alloc).
  */
 static BOOL SetClipboardUnicodeText(const WCHAR *s)
 {
@@ -439,7 +482,8 @@ static BOOL SetClipboardUnicodeText(const WCHAR *s)
 
 /**
  * @brief Restores clipboard from clipboardBackup and clears the backup pointer.
- * @warning EmptyClipboard clears all formats; only CF_UNICODETEXT is restored (see README).
+ * @warning EmptyClipboard clears all formats;
+ *          only CF_UNICODETEXT is restored(see README).
  */
 static void RestoreUnicodeClipboard(void)
 {
@@ -472,7 +516,8 @@ static void RestoreUnicodeClipboard(void)
 }
 
 /**
- * @brief Reads CF_UNICODETEXT with length and allocation bounded by CLIPBOARD_MAX_WCHARS.
+ * @brief Reads CF_UNICODETEXT with length and allocation bounded
+ *        by CLIPBOARD_MAX_WCHARS.
  * @param[out] out Allocated string (caller frees); set NULL on failure.
  * @param[out] outLen Character count excluding null.
  * @return FALSE if missing, too large, or allocation failed.
@@ -509,7 +554,7 @@ static BOOL ReadClipboardUnicodeLimited(WCHAR **out, size_t *outLen)
  */
 static void PressKey(WORD keyCode)
 {
-  INPUT input = { 0 };
+  INPUT input = {0};
   input.type = INPUT_KEYBOARD;
   input.ki.wVk = keyCode;
   SendInput(1, &input, sizeof(INPUT));
@@ -521,7 +566,7 @@ static void PressKey(WORD keyCode)
  */
 static void ReleaseKey(WORD keyCode)
 {
-  INPUT input = { 0 };
+  INPUT input = {0};
   input.type = INPUT_KEYBOARD;
   input.ki.wVk = keyCode;
   input.ki.dwFlags = KEYEVENTF_KEYUP;
@@ -529,7 +574,8 @@ static void ReleaseKey(WORD keyCode)
 }
 
 /**
- * @brief Injects a short press of the configured switch key (e.g. Caps Lock toggle).
+ * @brief Injects a short press of the configured switch key
+ *        (e.g. Caps Lock toggle).
  */
 static void SimulateOriginalKeyPress(void)
 {
@@ -539,7 +585,8 @@ static void SimulateOriginalKeyPress(void)
 }
 
 /**
- * @brief Sends Alt+Shift, Ctrl+Shift, or Win+Space per fallbackCycleHotkey if layout stuck.
+ * @brief Sends Alt+Shift, Ctrl+Shift,
+ *        or Win+Space per fallbackCycleHotkey if layout stuck.
  */
 static void SendSyntheticCycleHotkey(void)
 {
@@ -567,7 +614,8 @@ static void SendSyntheticCycleHotkey(void)
 }
 
 /**
- * @brief Activates target HKL for the foreground thread: focus window, then root, AttachThreadInput, then cycle hotkey.
+ * @brief Activates target HKL for the foreground thread: focus window,
+ *        then root, AttachThreadInput, then cycle hotkey.
  * @param target Layout handle to apply.
  */
 static void SwitchToLayoutHKL(HKL target)
@@ -591,17 +639,18 @@ static void SwitchToLayoutHKL(HKL target)
     hwndTarget = gti.hwndFocus;
 
   DWORD_PTR smres = 0;
-  SendMessageTimeoutW(hwndTarget, WM_INPUTLANGCHANGEREQUEST, 0, (LPARAM)target, SMTO_ABORTIFHUNG,
-                      (UINT)sendMsgTimeoutMs, &smres);
+  SendMessageTimeoutW(hwndTarget, WM_INPUTLANGCHANGEREQUEST, 0, (LPARAM)target,
+                      SMTO_ABORTIFHUNG, (UINT)sendMsgTimeoutMs, &smres);
 
   // Some hosts only route layout changes through the root window
   if (GetKeyboardLayout(tid) != target && hwndTarget != hwnd)
   {
-    SendMessageTimeoutW(hwnd, WM_INPUTLANGCHANGEREQUEST, 0, (LPARAM)target, SMTO_ABORTIFHUNG,
-                        (UINT)sendMsgTimeoutMs, &smres);
+    SendMessageTimeoutW(hwnd, WM_INPUTLANGCHANGEREQUEST, 0, (LPARAM)target,
+                        SMTO_ABORTIFHUNG, (UINT)sendMsgTimeoutMs, &smres);
   }
 
-  // Last API attempt: same-thread input attach lets ActivateKeyboardLayout hit the foreign queue
+  // Last API attempt: same-thread input attach lets ActivateKeyboardLayout hit
+  // the foreign queue
   if (GetKeyboardLayout(tid) != target)
   {
     DWORD curTid = GetCurrentThreadId();
@@ -632,7 +681,8 @@ void SwitchToSpecificLayout(void)
   HKL cur = GetKeyboardLayout(tid);
   HKL target;
 
-  // Unknown third layout: always jump toward hLayout1 then user toggles between the pair
+  // Unknown third layout: always jump toward hLayout1
+  // then user toggles between the pair
   if (cur == hLayout1)
     target = hLayout2;
   else if (cur == hLayout2)
@@ -646,13 +696,15 @@ void SwitchToSpecificLayout(void)
 /**
  * @brief How copy/paste keys are injected for conversion.
  */
-typedef enum {
+typedef enum
+{
   ConvertInput_CtrlHeld, ///< User holds Ctrl; only C/V keys are sent.
   ConvertInput_SyntheticCtrl ///< Full left-Ctrl chord (plain SmartCaps path).
 } ConvertInputKind;
 
 /**
- * @brief Sends left Ctrl down, vk down/up, left Ctrl up (VK_LCONTROL avoids ambiguous generic Ctrl).
+ * @brief Sends left Ctrl down, vk down/up, left Ctrl up
+ *        (VK_LCONTROL avoids ambiguous generic Ctrl).
  * @param vk Virtual key code.
  */
 static void SendSyntheticCtrlChord(WORD vk)
@@ -673,7 +725,8 @@ static void SendSyntheticCtrlChord(WORD vk)
 }
 
 /**
- * @brief Whether the clipboard after copy matches the pre-copy backup (no selection often leaves it unchanged).
+ * @brief Whether the clipboard after copy matches the pre-copy backup
+ *        (no selection often leaves it unchanged).
  * @param after Text after copy.
  * @param afterLen Length in WCHARs excluding null.
  * @return Nonzero if @a after equals the backed-up snapshot.
@@ -688,7 +741,8 @@ static BOOL ClipboardUnchangedAfterCopy(const WCHAR *after, size_t afterLen)
 }
 
 /**
- * @brief Frees optional text, restores clipboard, optionally switches layout (aborted conversion paths).
+ * @brief Frees optional text, restores clipboard, optionally switches layout
+ *        (aborted conversion paths).
  */
 static void AbortTryConvert(WCHAR *optionalText, BOOL switchLayoutOnEmpty)
 {
@@ -699,12 +753,14 @@ static void AbortTryConvert(WCHAR *optionalText, BOOL switchLayoutOnEmpty)
 }
 
 /**
- * @brief Queues TryConvertSelection on this thread (never call SendInput from inside hook).
+ * @brief Queues TryConvertSelection on this thread
+ *        (never call SendInput from inside hook).
  * @return TRUE if the message was posted.
  */
 static BOOL PostDeferConvert(ConvertInputKind kind, BOOL switchOnEmpty)
 {
-  if (PostThreadMessageW(GetCurrentThreadId(), WM_SWITCHY_DEFER, (WPARAM)kind, (LPARAM)switchOnEmpty))
+  if (PostThreadMessageW(GetCurrentThreadId(), WM_SWITCHY_DEFER, (WPARAM)kind,
+                         (LPARAM)switchOnEmpty))
     return TRUE;
   LOG(L"PostThreadMessage WM_SWITCHY_DEFER failed\n");
   return FALSE;
@@ -713,10 +769,12 @@ static BOOL PostDeferConvert(ConvertInputKind kind, BOOL switchOnEmpty)
 /**
  * @brief Copy -> convert -> paste pipeline, then switch to the target layout.
  * @param kind ConvertInput_CtrlHeld: user holds Ctrl, only C/V are injected.
- *             ConvertInput_SyntheticCtrl: full Ctrl+C / Ctrl+V (plain SmartCaps).
- * @param switchLayoutOnEmpty If TRUE, call SwitchToSpecificLayout when we skip conversion
- *            (empty, unchanged clipboard, backup failure, etc.).
- * @note Runs on the message thread via WM_SWITCHY_DEFER, not inside WH_KEYBOARD_LL (see hook handler).
+ *             ConvertInput_SyntheticCtrl: Ctrl+C / Ctrl+V (plain SmartCaps).
+ *
+ * @param switchLayoutOnEmpty If TRUE, call SwitchToSpecificLayout when we skip
+ *        conversion (empty, unchanged clipboard, backup failure, etc.).
+ * @note Runs on the message thread via WM_SWITCHY_DEFER,
+ *       not inside WH_KEYBOARD_LL (see hook handler).
  */
 static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
 {
@@ -742,7 +800,8 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
   HKL from = GetKeyboardLayout(tid);
   HKL to;
 
-  // Convert toward the "other" configured layout; unknown current maps to hLayout1 -> hLayout2
+  // Convert toward the "other" configured layout;
+  // unknown current maps to hLayout1 -> hLayout2
   if (from == hLayout1)
     to = hLayout2;
   else if (from == hLayout2)
@@ -758,10 +817,11 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
     return;
   }
 
-  // Inject copy: CtrlHeld assumes real Ctrl is down; Synthetic sends full Ctrl+C
+  // Inject copy: CtrlHeld assumes real Ctrl is down;
+  // Synthetic sends full Ctrl+C
   if (kind == ConvertInput_CtrlHeld)
   {
-    INPUT cin[2] = { 0 };
+    INPUT cin[2] = {0};
     cin[0].type = INPUT_KEYBOARD;
     cin[0].ki.wVk = 'C';
     cin[1].type = INPUT_KEYBOARD;
@@ -782,7 +842,8 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
     return;
   }
 
-  // Empty or identical to pre-copy snapshot ->treat as "no selection"; do not paste
+  // Empty or identical to pre-copy snapshot ->treat as "no selection";
+  // do not paste
   if (textLen == 0 || ClipboardUnchangedAfterCopy(text, textLen))
   {
     AbortTryConvert(text, switchLayoutOnEmpty);
@@ -810,7 +871,7 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
   // Paste converted text; again CtrlHeld uses real Ctrl for V
   if (kind == ConvertInput_CtrlHeld)
   {
-    INPUT vin[2] = { 0 };
+    INPUT vin[2] = {0};
     vin[0].type = INPUT_KEYBOARD;
     vin[0].ki.wVk = 'V';
     vin[1].type = INPUT_KEYBOARD;
@@ -830,7 +891,8 @@ static void TryConvertSelection(ConvertInputKind kind, BOOL switchLayoutOnEmpty)
 }
 
 /**
- * @brief WH_KEYBOARD_LL: switch key, Alt toggle, Shift+passthrough. Skips LLKHF_INJECTED (our SendInput).
+ * @brief WH_KEYBOARD_LL: switch key, Alt toggle, Shift+passthrough.
+ *        Skips LLKHF_INJECTED (our SendInput).
  * @param nCode Hook code.
  * @param wParam Window message.
  * @param lParam Keyboard event.
@@ -845,7 +907,7 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
   {
     if (key->vkCode == hotkeyVkCode)
     {
-      /* Alt+hotkey uses WM_SYSKEY* so we can tell Alt apart from plain hotkey. */
+      // Alt+hotkey uses WM_SYSKEY* so we can tell Alt apart from plain hotkey.
       if (wParam == WM_SYSKEYDOWN)
       {
         appSwitchRequired = TRUE;
@@ -868,7 +930,7 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
         hotkeyProcessed = TRUE;
         if (enabled)
         {
-          /* Shift+hotkey: later we synthesize a real key toggle (Caps LED etc.). */
+          // Shift+hotkey: later we synthesize a real key toggle (Caps LED etc.)
           if (shiftProcessed)
             hotkeyOriginalActionRequired = TRUE;
           return 1;
@@ -887,8 +949,9 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
           else
           {
             BOOL ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-            // Defer TryConvertSelection: SendInput must not run inside this callback or synthetic
-            // Ctrl+C/V interleaves with the still-processing hotkey release in some hosts.
+            // Defer TryConvertSelection: SendInput must not run inside this
+            // callback or synthetic Ctrl+C/V interleaves with the
+            // still-processing hotkey release in some hosts.
             if (ctrlDown && convertWithCtrl)
             {
               if (!PostDeferConvert(ConvertInput_CtrlHeld, smartCaps))
@@ -930,7 +993,8 @@ LRESULT CALLBACK HandleKeyboardEvent(int nCode, WPARAM wParam, LPARAM lParam)
 }
 
 /**
- * @brief Entry: single instance, load INI, install hook, message loop (WM_SWITCHY_DEFER before TranslateMessage).
+ * @brief Entry: single instance, load INI, install hook,
+ *        message loop (WM_SWITCHY_DEFER before TranslateMessage).
  */
 int main(void)
 {
@@ -967,7 +1031,8 @@ int main(void)
 
     if (messages.message == WM_SWITCHY_DEFER)
     {
-      TryConvertSelection((ConvertInputKind)messages.wParam, (BOOL)messages.lParam);
+      TryConvertSelection((ConvertInputKind)messages.wParam,
+                          (BOOL)messages.lParam);
       continue;
     }
     TranslateMessage(&messages);
