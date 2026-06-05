@@ -115,6 +115,18 @@ void Switchy_BuildCharMaps(HKL h1, HKL h2)
       }
     }
   }
+
+  // Remove reverse-map entries for code points that appear in both maps.
+  // A character "native" to L1 (has a forward L1→L2 entry) should pass through
+  // unchanged when encountered in L2→L1 conversion rather than being remapped to
+  // a different L1 key.  This prevents ASCII punctuation shared by both layouts
+  // (e.g. '.' and ',' which sit on different physical keys in EN vs RU) from
+  // being corrupted when converting mixed-layout text.
+  for (int c = 1; c < 65536; c++)
+  {
+    if (g_map_l1_to_l2[c] != 0 && g_map_l2_to_l1[c] != 0)
+      g_map_l2_to_l1[c] = 0;
+  }
 }
 
 /**
