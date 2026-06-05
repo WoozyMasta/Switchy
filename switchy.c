@@ -53,7 +53,7 @@ BOOL shiftProcessed = FALSE; ///< Shift held (passthrough Caps).
 BOOL convertWithCtrl = TRUE; ///< INI: Ctrl+switch runs conversion when TRUE.
 BOOL smartCaps = FALSE; ///< INI: plain switch may run synthetic Ctrl+C conversion.
 int fallbackCycleHotkey = 0; ///< 0=none, 1=Alt+Shift, 2=Ctrl+Shift, 3=Win+Space.
-int sendMsgTimeoutMs = SENDMSG_TIMEOUT_MS_DEFAULT; ///< INI: SwitchTimeoutMs — SendMessageTimeout for layout requests.
+int sendMsgTimeoutMs = SENDMSG_TIMEOUT_MS_DEFAULT; ///< INI: SwitchTimeoutMs - SendMessageTimeout for layout requests.
 
 WCHAR *excludeSwitch[MAX_EXCLUDE]; ///< Lowercase exe basenames; no layout switch in these apps.
 WCHAR *excludeConvert[MAX_EXCLUDE]; ///< Lowercase exe basenames; no Ctrl conversion in these apps.

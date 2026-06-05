@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Switchy"
+    Version="$(Version)"
+    Manufacturer="WoozyMasta"
+    UpgradeCode="{EF3C8778-1E9E-4886-8999-1AF9C2925930}"
+    Scope="perMachine"
+    InstallerVersion="500">
+
+    <MajorUpgrade
+      Schedule="afterInstallInitialize"
+      DowngradeErrorMessage="A newer version of Switchy is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLDIR" Name="Switchy" />
+    </StandardDirectory>
+
+    <Component Id="MainExecutable" Directory="INSTALLDIR">
+      <File Id="SwitchyExe" Source="switchy.exe" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DefaultConfig" Directory="INSTALLDIR">
+      <File Id="SwitchyIni" Source="switchy.ini" KeyPath="yes" />
+    </Component>
+
+    <Component Id="AutostartEntry" Directory="INSTALLDIR">
+      <RegistryValue
+        Root="HKCU"
+        Key="Software\Microsoft\Windows\CurrentVersion\Run"
+        Name="Switchy"
+        Value="[INSTALLDIR]switchy.exe"
+        Type="string"
+        KeyPath="yes" />
+    </Component>
+
+    <Feature Id="ProductFeature" Title="Switchy" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="DefaultConfig" />
+    </Feature>
+
+    <Feature Id="AutostartFeature" Title="Run at Windows startup" Level="1">
+      <ComponentRef Id="AutostartEntry" />
+    </Feature>
+
+  </Package>
+</Wix>
