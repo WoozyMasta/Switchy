@@ -27,10 +27,23 @@ jobs:
             make
             gawk
 
+      - name: Run tests
+        shell: msys2 {0}
+        run: make test
+
       - name: Compile
+        shell: msys2 {0}
         run: make build
 
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix
+
+      - name: Build MSI
+        shell: msys2 {0}
+        run: make msi VERSION=${{ github.ref_name }}
+
       - name: Extract changelog
+        shell: msys2 {0}
         run: make release-notes > release.md
 
       - name: Create GitHub release
@@ -39,4 +52,4 @@ jobs:
           tag: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           bodyFile: release.md
-          artifacts: switchy.exe,switchy.ini
+          artifacts: switchy.exe,switchy.ini,switchy.msi

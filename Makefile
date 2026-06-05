@@ -1,12 +1,14 @@
 CC = gcc
 CFLAGS = -O2 -mwindows -std=c99
+CFLAGS_TEST = -O0 -std=c99 -Wall
 LIBS = -luser32 -lkernel32
 SRC = switchy.c charmap.c
 TARGET = switchy.exe
+VERSION ?= 0.0.0
 
-.PHONY: all build clean release-notes release
+.PHONY: all build msi clean test test-charmap release-notes release
 
-all: build
+all: clean test build msi
 
 build: $(TARGET)
 
@@ -15,8 +17,17 @@ $(TARGET): $(SRC)
 	sleep 0.5
 	$(CC) $(SRC) -o $(TARGET) $(CFLAGS) $(LIBS)
 
+msi: $(TARGET) switchy.wxs
+	wix build -acceptEula wix7 switchy.wxs -d Version=$(VERSION) -o switchy.msi
+
+test: test-charmap
+	./tests/test_charmap.exe
+
+test-charmap: charmap.c tests/test_charmap.c
+	$(CC) charmap.c tests/test_charmap.c -o tests/test_charmap.exe $(CFLAGS_TEST) $(LIBS)
+
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) tests/test_charmap.exe switchy.msi
 
 release-notes:
 	@awk '\
