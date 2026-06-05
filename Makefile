@@ -1,16 +1,16 @@
-CC = gcc
-CFLAGS = -O2 -mwindows -std=c99
-CFLAGS_TEST = -O0 -std=c99 -Wall
-LIBS = -luser32 -lkernel32
-SRC = switchy.c charmap.c
-TARGET = switchy.exe
-VERSION ?= 0.0.0
+CC           = gcc
+WINDRES      = windres
+CFLAGS       = -O2 -mwindows -std=c99
+CFLAGS_TEST  = -O0 -std=c99 -Wall
+LIBS         = -luser32 -lkernel32
+SRC          = switchy.c charmap.c
+RES_OBJ      = switchy_res.o
+TARGET       = switchy.exe
+FORMAT_SRCS  = switchy.c charmap.c charmap.h tests/test_charmap.c
 
+VERSION      ?= 0.0.0
 CLANG_FORMAT ?= clang-format
-# lint requires MSYS2 clang-tidy (mingw-w64-ucrt-x86_64-clang-tools-extra).
-# Run from MSYS2 terminal or override: make lint CLANG_TIDY=/path/to/clang-tidy
 CLANG_TIDY   ?= clang-tidy
-FORMAT_SRCS   = switchy.c charmap.c charmap.h tests/test_charmap.c
 
 .PHONY: all build msi clean test test-charmap fmt fmt-check lint wix release-notes release
 
@@ -18,10 +18,13 @@ all: clean test build msi
 
 build: $(TARGET)
 
-$(TARGET): $(SRC)
+$(RES_OBJ): switchy.rc switchy.ico
+	$(WINDRES) switchy.rc -o $(RES_OBJ)
+
+$(TARGET): $(SRC) $(RES_OBJ)
 	-taskkill //F //IM $(TARGET) > /dev/null 2>&1 || true
 	sleep 0.5
-	$(CC) $(SRC) -o $(TARGET) $(CFLAGS) $(LIBS)
+	$(CC) $(SRC) $(RES_OBJ) -o $(TARGET) $(CFLAGS) $(LIBS)
 
 msi: $(TARGET) switchy.wxs
 	wix build -acceptEula wix7 -ext WixToolset.Util.wixext switchy.wxs -d Version=$(VERSION) -o switchy.msi
@@ -42,7 +45,7 @@ lint:
 	$(CLANG_TIDY) -quiet $(SRC) -- -std=c99
 
 clean:
-	rm -f $(TARGET) tests/test_charmap.exe switchy.msi
+	rm -f $(TARGET) $(RES_OBJ) tests/test_charmap.exe switchy.msi
 
 wix:
 	dotnet tool install --global wix

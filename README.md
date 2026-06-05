@@ -1,5 +1,8 @@
 # Switchy
 
+<!-- markdownlint-disable-next-line MD033 -->
+<img src="switchy.png" alt="Switchy" align="right" width="128">
+
 A lightweight utility to toggle between two specific keyboard layouts
 using **Caps Lock** (or any other specified key).
 
