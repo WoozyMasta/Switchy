@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="Switchy"
     Version="$(Version)"
@@ -13,6 +14,31 @@
       DowngradeErrorMessage="A newer version of Switchy is already installed." />
 
     <MediaTemplate EmbedCab="yes" />
+
+    <!-- Terminate any running instance before files are replaced -->
+    <util:CloseApplication
+      Id="CloseRunning"
+      Target="switchy.exe"
+      CloseMessage="yes"
+      TerminateProcess="0"
+      RebootPrompt="no" />
+
+    <!-- Launch after install completes -->
+    <SetProperty Id="WixShellExecTarget"
+      Value="[INSTALLDIR]switchy.exe"
+      Sequence="execute"
+      Before="LaunchAfterInstall" />
+    <CustomAction Id="LaunchAfterInstall"
+      BinaryRef="Wix4UtilCA_X64"
+      DllEntry="WixShellExec"
+      Impersonate="yes"
+      Execute="immediate"
+      Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="LaunchAfterInstall" After="InstallFinalize"
+              Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLDIR" Name="Switchy" />

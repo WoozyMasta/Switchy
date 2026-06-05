@@ -45,7 +45,7 @@ jobs:
         run: make build
 
       - name: Install WiX Toolset
-        run: dotnet tool install --global wix
+        run: make wix
 
       - name: Build MSI
         shell: msys2 {0}

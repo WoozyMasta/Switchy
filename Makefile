@@ -12,7 +12,7 @@ CLANG_FORMAT ?= clang-format
 CLANG_TIDY   ?= clang-tidy
 FORMAT_SRCS   = switchy.c charmap.c charmap.h tests/test_charmap.c
 
-.PHONY: all build msi clean test test-charmap fmt fmt-check lint release-notes release
+.PHONY: all build msi clean test test-charmap fmt fmt-check lint wix release-notes release
 
 all: clean test build msi
 
@@ -24,7 +24,7 @@ $(TARGET): $(SRC)
 	$(CC) $(SRC) -o $(TARGET) $(CFLAGS) $(LIBS)
 
 msi: $(TARGET) switchy.wxs
-	wix build -acceptEula wix7 switchy.wxs -d Version=$(VERSION) -o switchy.msi
+	wix build -acceptEula wix7 -ext WixToolset.Util.wixext switchy.wxs -d Version=$(VERSION) -o switchy.msi
 
 test: test-charmap
 	./tests/test_charmap.exe
@@ -43,6 +43,10 @@ lint:
 
 clean:
 	rm -f $(TARGET) tests/test_charmap.exe switchy.msi
+
+wix:
+	dotnet tool install --global wix
+	wix -acceptEula wix7 extension add WixToolset.Util.wixext
 
 release-notes:
 	@awk '\

@@ -107,3 +107,5 @@ $RECYCLE.BIN/
 
 switchy.exe
 *.wixpdb
+.wix/
+nuget.config
